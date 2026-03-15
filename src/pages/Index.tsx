@@ -8,18 +8,23 @@ import { StrengthCard } from '@/components/StrengthCard';
 import { ActionCard } from '@/components/ActionCard';
 import { TerminalLoader } from '@/components/TerminalLoader';
 import { PerformancePanel } from '@/components/PerformancePanel';
+import { PerformanceCharts } from '@/components/PerformanceCharts';
+import { DevicePreview } from '@/components/DevicePreview';
 import { generateMockAudit } from '@/lib/mock-audit';
+import { supabase } from '@/integrations/supabase/client';
 import type { AuditReport, Severity } from '@/lib/audit-types';
 
 type AppState = 'idle' | 'loading' | 'report';
-type ReportTab = 'performance' | 'findings' | 'strengths' | 'actions';
+type ReportTab = 'performance' | 'charts' | 'findings' | 'strengths' | 'actions' | 'preview';
 type FindingFilter = 'all' | 'critical' | 'easy';
 
 const tabs: { key: ReportTab; label: string }[] = [
   { key: 'performance', label: 'PERFORMANCE' },
+  { key: 'charts', label: 'CHARTS' },
   { key: 'findings', label: 'FINDINGS' },
   { key: 'strengths', label: 'STRENGTHS' },
   { key: 'actions', label: 'ACTIONS' },
+  { key: 'preview', label: 'DEVICE PREVIEW' },
 ];
 
 const filterButtons: { key: FindingFilter; label: string }[] = [
@@ -36,6 +41,7 @@ const Index = () => {
   const [report, setReport] = useState<AuditReport | null>(null);
   const [activeTab, setActiveTab] = useState<ReportTab>('performance');
   const [filter, setFilter] = useState<FindingFilter>('all');
+  const [apiData, setApiData] = useState<any>(null);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +49,66 @@ const Index = () => {
     setState('loading');
   }, [url]);
 
-  const handleLoaderComplete = useCallback(() => {
+  const handleLoaderComplete = useCallback(async () => {
+    // Try real API first, fall back to mock
+    try {
+      const { data, error } = await supabase.functions.invoke('pagespeed-audit', {
+        body: { url },
+      });
+
+      if (!error && data && !data.error) {
+        setApiData(data);
+        // Build report from real data, using desktop scores for primary
+        const d = data.desktop;
+        const m = data.mobile;
+
+        // Blend mobile (60%) + desktop (40%) for performance
+        const perfScore = Math.round(m.scores.performance * 0.6 + d.scores.performance * 0.4);
+        const seoScore = Math.round((m.scores.seo + d.scores.seo) / 2);
+        const mobileScore = m.scores.performance;
+        const securityScore = Math.round((m.scores.bestPractices + d.scores.bestPractices) / 2);
+
+        const globalScore = Math.round(
+          perfScore * 0.4 + seoScore * 0.25 + mobileScore * 0.2 + securityScore * 0.15
+        );
+
+        const getColor = (s: number) =>
+          s >= 90 ? 'hsl(105, 100%, 55%)' : s >= 70 ? 'hsl(45, 100%, 50%)' : s >= 50 ? 'hsl(20, 100%, 60%)' : 'hsl(0, 100%, 62%)';
+
+        // Use mock for findings/strengths/actions structure, but real metrics
+        const mockReport = generateMockAudit(url);
+
+        const realReport: AuditReport = {
+          ...mockReport,
+          url,
+          timestamp: new Date().toISOString(),
+          globalScore,
+          dimensions: [
+            { label: 'Performance', score: perfScore, weight: 40, color: getColor(perfScore) },
+            { label: 'SEO Structure', score: seoScore, weight: 25, color: getColor(seoScore) },
+            { label: 'Mobile', score: mobileScore, weight: 20, color: getColor(mobileScore) },
+            { label: 'Security', score: securityScore, weight: 15, color: getColor(securityScore) },
+          ],
+          performance: {
+            ttfb: d.metrics.ttfb,
+            fcp: d.metrics.fcp,
+            lcp: d.metrics.lcp,
+            tbt: d.metrics.tbt,
+            cls: d.metrics.cls,
+            totalLoadTime: d.metrics.tti,
+            requestCount: mockReport.performance.requestCount,
+            transferSize: mockReport.performance.transferSize,
+          },
+        };
+
+        setReport(realReport);
+        setState('report');
+        return;
+      }
+    } catch {
+      // Fall through to mock
+    }
+
     const audit = generateMockAudit(url);
     setReport(audit);
     setState('report');
@@ -179,10 +244,11 @@ const Index = () => {
                   </h2>
                   <p className="font-mono text-xs text-muted-foreground mt-1">
                     {report.url} — {new Date(report.timestamp).toLocaleString()}
+                    {apiData && <span className="text-primary ml-2">● LIVE DATA</span>}
                   </p>
                 </div>
                 <button
-                  onClick={() => { setState('idle'); setReport(null); setUrl(''); }}
+                  onClick={() => { setState('idle'); setReport(null); setUrl(''); setApiData(null); }}
                   className="font-mono text-xs text-primary hover:underline"
                 >
                   NEW SCAN
@@ -203,12 +269,12 @@ const Index = () => {
 
               {/* Tabs + Filter */}
               <div className="flex items-center justify-between mb-4 border-b border-border">
-                <div className="flex">
+                <div className="flex overflow-x-auto">
                   {tabs.map((tab) => (
                     <button
                       key={tab.key}
                       onClick={() => setActiveTab(tab.key)}
-                      className={`relative px-4 py-3 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors duration-150 ${activeTab === tab.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`relative px-4 py-3 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors duration-150 whitespace-nowrap ${activeTab === tab.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       {tab.label}
                       {activeTab === tab.key && (
@@ -244,6 +310,11 @@ const Index = () => {
                     <PerformancePanel metrics={report.performance} technical={report.technical} />
                   </motion.div>
                 )}
+                {activeTab === 'charts' && (
+                  <motion.div key="charts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <PerformanceCharts metrics={report.performance} dimensions={report.dimensions} />
+                  </motion.div>
+                )}
                 {activeTab === 'findings' && (
                   <motion.div key="findings" className="space-y-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     {getFilteredFindings().map((f, i) => (
@@ -269,6 +340,11 @@ const Index = () => {
                     {getFilteredActions().length === 0 && (
                       <p className="tech-label text-center py-8">No actions match the current filter</p>
                     )}
+                  </motion.div>
+                )}
+                {activeTab === 'preview' && (
+                  <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <DevicePreview url={report.url} />
                   </motion.div>
                 )}
               </AnimatePresence>

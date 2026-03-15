@@ -1,1 +1,7 @@
 project_id = "kjcihssnmykbjwuxuuoi"
+
+[functions.pagespeed-audit]
+verify_jwt = false
+
+[functions.screenshot]
+verify_jwt = false
