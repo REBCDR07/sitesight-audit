@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_history: {
+        Row: {
+          actions: Json
+          created_at: string
+          desktop_metrics: Json
+          desktop_scores: Json
+          dimensions: Json
+          dns_info: Json
+          findings: Json
+          global_score: number
+          id: string
+          mobile_metrics: Json
+          mobile_scores: Json
+          strengths: Json
+          url: string
+        }
+        Insert: {
+          actions?: Json
+          created_at?: string
+          desktop_metrics?: Json
+          desktop_scores?: Json
+          dimensions?: Json
+          dns_info?: Json
+          findings?: Json
+          global_score?: number
+          id?: string
+          mobile_metrics?: Json
+          mobile_scores?: Json
+          strengths?: Json
+          url: string
+        }
+        Update: {
+          actions?: Json
+          created_at?: string
+          desktop_metrics?: Json
+          desktop_scores?: Json
+          dimensions?: Json
+          dns_info?: Json
+          findings?: Json
+          global_score?: number
+          id?: string
+          mobile_metrics?: Json
+          mobile_scores?: Json
+          strengths?: Json
+          url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
