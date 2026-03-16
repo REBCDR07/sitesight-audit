@@ -10,21 +10,27 @@ import { TerminalLoader } from '@/components/TerminalLoader';
 import { PerformancePanel } from '@/components/PerformancePanel';
 import { PerformanceCharts } from '@/components/PerformanceCharts';
 import { DevicePreview } from '@/components/DevicePreview';
+import { MobileDesktopComparison } from '@/components/MobileDesktopComparison';
+import { HistoryPanel } from '@/components/HistoryPanel';
+import { DnsInfoPanel } from '@/components/DnsInfoPanel';
 import { generateMockAudit } from '@/lib/mock-audit';
 import { supabase } from '@/integrations/supabase/client';
 import type { AuditReport, Severity } from '@/lib/audit-types';
 
 type AppState = 'idle' | 'loading' | 'report';
-type ReportTab = 'performance' | 'charts' | 'findings' | 'strengths' | 'actions' | 'preview';
+type ReportTab = 'performance' | 'comparison' | 'charts' | 'dns' | 'findings' | 'strengths' | 'actions' | 'history' | 'preview';
 type FindingFilter = 'all' | 'critical' | 'easy';
 
 const tabs: { key: ReportTab; label: string }[] = [
   { key: 'performance', label: 'PERFORMANCE' },
+  { key: 'comparison', label: 'MOBILE VS DESKTOP' },
   { key: 'charts', label: 'CHARTS' },
+  { key: 'dns', label: 'DNS & SSL' },
   { key: 'findings', label: 'FINDINGS' },
   { key: 'strengths', label: 'STRENGTHS' },
   { key: 'actions', label: 'ACTIONS' },
-  { key: 'preview', label: 'DEVICE PREVIEW' },
+  { key: 'history', label: 'HISTORY' },
+  { key: 'preview', label: 'PREVIEW' },
 ];
 
 const filterButtons: { key: FindingFilter; label: string }[] = [
@@ -42,27 +48,53 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState<ReportTab>('performance');
   const [filter, setFilter] = useState<FindingFilter>('all');
   const [apiData, setApiData] = useState<any>(null);
+  const [dnsError, setDnsError] = useState<string | null>(null);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
+    setDnsError(null);
     setState('loading');
   }, [url]);
 
+  const saveToHistory = useCallback(async (report: AuditReport, apiData: any) => {
+    try {
+      await supabase.from('audit_history').insert({
+        url: report.url,
+        global_score: report.globalScore,
+        mobile_scores: apiData?.mobile?.scores || {},
+        desktop_scores: apiData?.desktop?.scores || {},
+        mobile_metrics: apiData?.mobile?.metrics || {},
+        desktop_metrics: apiData?.desktop?.metrics || {},
+        findings: report.findings,
+        strengths: report.strengths,
+        actions: report.actions,
+        dns_info: apiData?.dnsInfo || {},
+        dimensions: report.dimensions,
+      });
+    } catch (e) {
+      console.error('Failed to save audit history:', e);
+    }
+  }, []);
+
   const handleLoaderComplete = useCallback(async () => {
-    // Try real API first, fall back to mock
     try {
       const { data, error } = await supabase.functions.invoke('pagespeed-audit', {
         body: { url },
       });
 
+      // Check for DNS error
+      if (data?.error && data?.dnsInfo) {
+        setDnsError(data.error);
+        setState('idle');
+        return;
+      }
+
       if (!error && data && !data.error) {
         setApiData(data);
-        // Build report from real data, using desktop scores for primary
         const d = data.desktop;
         const m = data.mobile;
 
-        // Blend mobile (60%) + desktop (40%) for performance
         const perfScore = Math.round(m.scores.performance * 0.6 + d.scores.performance * 0.4);
         const seoScore = Math.round((m.scores.seo + d.scores.seo) / 2);
         const mobileScore = m.scores.performance;
@@ -75,11 +107,7 @@ const Index = () => {
         const getColor = (s: number) =>
           s >= 90 ? 'hsl(105, 100%, 55%)' : s >= 70 ? 'hsl(45, 100%, 50%)' : s >= 50 ? 'hsl(20, 100%, 60%)' : 'hsl(0, 100%, 62%)';
 
-        // Use mock for findings/strengths/actions structure, but real metrics
-        const mockReport = generateMockAudit(url);
-
         const realReport: AuditReport = {
-          ...mockReport,
           url,
           timestamp: new Date().toISOString(),
           globalScore,
@@ -96,13 +124,29 @@ const Index = () => {
             tbt: d.metrics.tbt,
             cls: d.metrics.cls,
             totalLoadTime: d.metrics.tti,
-            requestCount: mockReport.performance.requestCount,
-            transferSize: mockReport.performance.transferSize,
+            requestCount: 0,
+            transferSize: '—',
           },
+          technical: {
+            httpStatus: data.dnsInfo?.httpStatus || 200,
+            sslValid: data.dnsInfo?.sslValid || false,
+            sslExpiry: '—',
+            cdnDetected: data.dnsInfo?.cdnDetected || null,
+            redirects: 0,
+            compression: data.dnsInfo?.compression || 'unknown',
+            cacheControl: data.dnsInfo?.cacheControl || 'not set',
+            securityHeaders: data.dnsInfo?.securityHeaders || {},
+          },
+          // Use REAL findings from PageSpeed API
+          findings: data.findings || [],
+          strengths: data.strengths || [],
+          actions: data.actions || [],
         };
 
         setReport(realReport);
         setState('report');
+        // Save to history
+        await saveToHistory(realReport, data);
         return;
       }
     } catch {
@@ -112,7 +156,8 @@ const Index = () => {
     const audit = generateMockAudit(url);
     setReport(audit);
     setState('report');
-  }, [url]);
+    await saveToHistory(audit, null);
+  }, [url, saveToHistory]);
 
   const getFilteredFindings = useCallback(() => {
     if (!report) return [];
@@ -153,7 +198,7 @@ const Index = () => {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <AnimatePresence mode="wait">
-          {/* IDLE: URL Input Hero */}
+          {/* IDLE */}
           {state === 'idle' && (
             <motion.div
               key="idle"
@@ -175,6 +220,19 @@ const Index = () => {
                   Enter a URL to begin full-spectrum technical audit
                 </p>
               </motion.div>
+
+              {dnsError && (
+                <motion.div
+                  className="w-full max-w-2xl mb-4 tech-card severity-critical"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <p className="font-mono text-xs text-critical">{dnsError}</p>
+                  <p className="font-mono text-[10px] text-muted-foreground mt-1">
+                    Verify the URL is accessible and the DNS is properly configured.
+                  </p>
+                </motion.div>
+              )}
 
               <motion.form
                 onSubmit={handleSubmit}
@@ -205,14 +263,14 @@ const Index = () => {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.4 }}
               >
-                {['Performance', 'SEO', 'Mobile', 'Security'].map((dim) => (
+                {['Performance', 'SEO', 'Mobile', 'Security', 'DNS'].map((dim) => (
                   <span key={dim} className="tech-label">{dim}</span>
                 ))}
               </motion.div>
             </motion.div>
           )}
 
-          {/* LOADING: Terminal Sequence */}
+          {/* LOADING */}
           {state === 'loading' && (
             <motion.div
               key="loading"
@@ -228,7 +286,7 @@ const Index = () => {
             </motion.div>
           )}
 
-          {/* REPORT: Dashboard */}
+          {/* REPORT */}
           {state === 'report' && report && (
             <motion.div
               key="report"
@@ -245,6 +303,9 @@ const Index = () => {
                   <p className="font-mono text-xs text-muted-foreground mt-1">
                     {report.url} — {new Date(report.timestamp).toLocaleString()}
                     {apiData && <span className="text-primary ml-2">● LIVE DATA</span>}
+                    {apiData?.dnsInfo && (
+                      <span className="text-success ml-2">● DNS VERIFIED</span>
+                    )}
                   </p>
                 </div>
                 <button
@@ -255,7 +316,7 @@ const Index = () => {
                 </button>
               </div>
 
-              {/* Score + Dimensions Row */}
+              {/* Score + Dimensions */}
               <div className="grid grid-cols-12 gap-6 mb-6">
                 <div className="col-span-12 lg:col-span-4 tech-card flex items-center justify-center">
                   <ScoreRing score={report.globalScore} />
@@ -310,9 +371,39 @@ const Index = () => {
                     <PerformancePanel metrics={report.performance} technical={report.technical} />
                   </motion.div>
                 )}
+                {activeTab === 'comparison' && apiData && (
+                  <motion.div key="comparison" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <MobileDesktopComparison
+                      mobileScores={apiData.mobile.scores}
+                      desktopScores={apiData.desktop.scores}
+                      mobileMetrics={apiData.mobile.metrics}
+                      desktopMetrics={apiData.desktop.metrics}
+                    />
+                  </motion.div>
+                )}
+                {activeTab === 'comparison' && !apiData && (
+                  <motion.div key="comparison-mock" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <div className="tech-card text-center py-12">
+                      <p className="tech-label">Mobile vs Desktop comparison requires live API data</p>
+                      <p className="font-mono text-xs text-muted-foreground mt-1">Run a scan with PageSpeed API connected</p>
+                    </div>
+                  </motion.div>
+                )}
                 {activeTab === 'charts' && (
                   <motion.div key="charts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     <PerformanceCharts metrics={report.performance} dimensions={report.dimensions} />
+                  </motion.div>
+                )}
+                {activeTab === 'dns' && apiData?.dnsInfo && (
+                  <motion.div key="dns" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <DnsInfoPanel dnsInfo={apiData.dnsInfo} />
+                  </motion.div>
+                )}
+                {activeTab === 'dns' && !apiData?.dnsInfo && (
+                  <motion.div key="dns-mock" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <div className="tech-card text-center py-12">
+                      <p className="tech-label">DNS info requires live API data</p>
+                    </div>
                   </motion.div>
                 )}
                 {activeTab === 'findings' && (
@@ -340,6 +431,11 @@ const Index = () => {
                     {getFilteredActions().length === 0 && (
                       <p className="tech-label text-center py-8">No actions match the current filter</p>
                     )}
+                  </motion.div>
+                )}
+                {activeTab === 'history' && (
+                  <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <HistoryPanel currentUrl={report.url} />
                   </motion.div>
                 )}
                 {activeTab === 'preview' && (
