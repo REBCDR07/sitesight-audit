@@ -59,19 +59,19 @@ const Index = () => {
 
   const saveToHistory = useCallback(async (report: AuditReport, apiData: any) => {
     try {
-      await supabase.from('audit_history').insert({
+      await supabase.from('audit_history').insert([{
         url: report.url,
         global_score: report.globalScore,
         mobile_scores: apiData?.mobile?.scores || {},
         desktop_scores: apiData?.desktop?.scores || {},
         mobile_metrics: apiData?.mobile?.metrics || {},
         desktop_metrics: apiData?.desktop?.metrics || {},
-        findings: report.findings,
-        strengths: report.strengths,
-        actions: report.actions,
+        findings: report.findings as any,
+        strengths: report.strengths as any,
+        actions: report.actions as any,
         dns_info: apiData?.dnsInfo || {},
-        dimensions: report.dimensions,
-      });
+        dimensions: report.dimensions as any,
+      }]);
     } catch (e) {
       console.error('Failed to save audit history:', e);
     }
