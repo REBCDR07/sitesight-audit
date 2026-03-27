@@ -1,73 +1,71 @@
-# Welcome to your Lovable project
+# 🔍 SiteScope – Audit Web Technique & Performance
 
-## Project info
+> **53 % des visiteurs quittent un site si la page met plus de 3 secondes à charger.**  
+> Et votre site, il met combien de temps ?
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+SiteScope est un outil d’audit web tout-en-un qui analyse en profondeur la performance, la santé technique, le SEO, l’accessibilité et l’expérience mobile d’un site.  
+Saisissez une URL, obtenez un rapport complet avec scores, priorités d’amélioration et plan d’action.
 
-## How can I edit this code?
+🌐 **Version live** : [https://sitesight-audit.vercel.app/](https://sitesight-audit.vercel.app/)
 
-There are several ways of editing your application.
+---
 
-**Use Lovable**
+## ✨ Fonctionnalités
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### ⚡ Performance réelle
+- TTFB, FCP, LCP, TBT, CLS  
+- Temps de chargement total  
+- Poids de la page et nombre de requêtes HTTP
 
-Changes made via Lovable will be committed automatically to this repo.
+### 🔒 Santé technique
+- Statut SSL & HTTP  
+- Détection CDN  
+- Analyse des redirections  
+- Compression Gzip/Brotli
 
-**Use your preferred IDE**
+### 🏗 Structure & SEO
+- Sémantique HTML (balises, headings)  
+- Métadonnées (title, meta description, Open Graph)  
+- robots.txt et sitemap  
+- Accessibilité de base  
+- ⚠️ Données structurées *(en cours d’amélioration)*
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 📱 Responsive & Mobile First
+- Rendu sur 3 types d’appareils  
+- Éléments tactiles (touch targets)  
+- Détection des breakpoints et ruptures de layout par viewport
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 📊 Rapport intelligible
+- ✅ Ce qui fonctionne bien  
+- 🔴 Points bloquants classés par criticité  
+- 🛠 Plan d’action avec estimation d’effort  
+- 💡 Suggestions d’amélioration avancées *(en cours)*
 
-Follow these steps:
+### 🧮 Score global (0–100)
+- Export PDF *(en développement)*
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🚀 Utilisation
 
-# Step 3: Install the necessary dependencies.
-npm i
+1. Rendez-vous sur [https://sitesight-audit.vercel.app/](https://sitesight-audit.vercel.app/)  
+2. Saisissez l’URL du site à auditer  
+3. Lancez l’analyse  
+4. Consultez le rapport détaillé et les recommandations
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+---
 
-**Edit a file directly in GitHub**
+## 🛠 Stack technique
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- **Frontend** : ReactJs & TypeScript 
+- **Déploiement** : Vercel  
+- **API d’audit** : Google API PageSpeed Insight + analyses personnalisées  
+- **Styles** : CSS Modules / Tailwind CSS *(selon votre stack réelle)*
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📦 Installation locale
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```bash
+# Cloner le repository
+git clone https://github.com/REBCDR07/sitesight-audit.git
